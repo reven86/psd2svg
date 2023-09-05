@@ -8,7 +8,8 @@ def get_version():
     curdir = os.path.dirname(__file__)
     filename = os.path.join(curdir, 'src', 'psd2svg', 'version.py')
     with open(filename, 'rb') as fp:
-        return fp.read().decode('utf8').split('=')[1].strip(" \n'")
+        return fp.read().decode('utf8').split('=')[1].strip(" \r\n'")
+
 
 
 def readme():

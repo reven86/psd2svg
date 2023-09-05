@@ -22,6 +22,8 @@ def main():
     parser.add_argument(
         '--loglevel', metavar='LEVEL', default='WARNING',
         help='Logging level, default WARNING')
+    parser.add_argument('--shapes-only', action='store_true', help='Ignore layers and mask containing pixels.')
+    parser.add_argument('--compact', action='store_true', help='Optimize output svg size by storing only visible layers, skipping layer titles, etc.')
     args = parser.parse_args()
 
     logging.basicConfig(level=getattr(logging, args.loglevel.upper(),
@@ -36,7 +38,7 @@ def main():
         image = rasterizer.rasterize(svg_file)
         image.save(args.output)
     else:
-        psd2svg(args.input, args.output, resource_path=args.resource_path)
+        psd2svg(args.input, args.output, resource_path=args.resource_path, shapes_only=args.shapes_only, compact=args.compact)
 
 
 if __name__ == '__main__':

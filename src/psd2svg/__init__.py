@@ -28,8 +28,10 @@ class PSD2SVG(AdjustmentsConverter, EffectsConverter, LayerConverter,
     output_url - url or file-like object to export svg. if None, return data.
     export_resource - use dataURI to embed bitmap (default True)
     """
-    def __init__(self, resource_path=None):
+    def __init__(self, resource_path=None, shapes_only=False, compact=False):
         self.resource_path = resource_path
+        self.shapes_only = shapes_only
+        self.compact = compact        
 
     def reset(self):
         """Reset the converter."""

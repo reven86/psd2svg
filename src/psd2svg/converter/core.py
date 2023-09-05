@@ -15,28 +15,34 @@ logger = getLogger(__name__)
 
 class LayerConverter(object):
 
+    def __init__(self):
+        self.shapes_only = False
+        self.compact = False            
+
     def convert_layer(self, layer):
         """
         Convert the given layer.
 
-        The current implementation always converts a PSD layer to a single
-        SVG element.
+        Converts PSD layer to multiple SVG elements.
 
         :return: SVG element.
         """
+        if self.compact and not layer.visible:
+            return None
+
         if layer.is_group():
             element = self.create_group(layer)
 
-        elif layer.has_pixels():
+        elif not self.shapes_only and layer.has_pixels():
             element = self.create_image(layer)
-
-        elif isinstance(layer, FillLayer):
-            element = self.create_fill(layer)
 
         elif isinstance(layer, ShapeLayer):
             element = self.create_path(layer)
             element = self.add_fill(layer, element)
             element = self.add_stroke_style(layer, element)
+
+        elif isinstance(layer, FillLayer):
+            element = self.create_fill(layer)
 
         elif isinstance(layer, AdjustmentLayer):
             return None
@@ -48,7 +54,8 @@ class LayerConverter(object):
             return None
 
         element = self.add_attributes(layer, element)
-        if layer.has_mask() and not layer.mask.disabled:
+
+        if layer.has_mask() and not layer.mask.disabled and not self.shapes_only:
             mask_element = self.create_mask(layer)
             if mask_element:
                 element['mask'] = mask_element.get_funciri()
@@ -199,7 +206,8 @@ class LayerConverter(object):
 
     def add_attributes(self, layer, element):
         """Add layer attributes such as blending or visibility options."""
-        element.set_desc(title=safe_utf8(layer.name))
+        if not self.compact:        
+            element.set_desc(title=safe_utf8(layer.name))
         element['class'] = 'psd-layer {}'.format(layer.kind)
         if not layer.visible:
             element['visibility'] = 'hidden'
