@@ -14,7 +14,7 @@ class ShapeConverter(object):
         """Convert each path in vector_mask as individual path element. Groups the together."""
 
         if len(vector_mask.paths) == 1:
-            return self._dwg.path(d=self._generate_path(path))
+            return self._dwg.path(d=self._generate_path(vector_mask.paths[0]))
 
         container = self._dwg.g()
         mask = None
