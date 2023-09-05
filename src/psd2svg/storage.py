@@ -19,14 +19,14 @@ logger = getLogger(__name__)
 
 def get_storage(dirname, **kwargs):
     result = urlparse(dirname)
-    if not result.scheme:
-        return FileSystemStorage(dirname, **kwargs)
-    elif result.scheme == 's3':
+    if result.scheme == 's3':
         return S3Storage(result.netloc, result.path, **kwargs)
     elif result.scheme == 'hdfs':
         return HdfsStorage(result.netloc, result.path, **kwargs)
-    else:
+    elif result.scheme in ('http', 'https'):
         return UrlStorage(dirname, **kwargs)
+    else:
+        return FileSystemStorage(dirname, **kwargs)
 
 
 def _get_mime(filename):

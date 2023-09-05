@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, unicode_literals
 from logging import getLogger
+import os
 import svgwrite
 from psd_tools import PSDImage
 from psd2svg.converter.adjustments import AdjustmentsConverter
@@ -17,6 +18,13 @@ logger = getLogger(__name__)
 
 def psd2svg(input, output=None, **kwargs):
     converter = PSD2SVG(**kwargs)
+
+    if os.path.isdir(input):
+        for filename in os.listdir(input):
+            if filename[-4:] == '.psd':
+                converter.convert(os.path.join(input, filename), os.path.join(output or '', filename[:-4] + '.svg'))
+        return
+    
     return converter.convert(input, output)
 
 
