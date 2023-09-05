@@ -37,7 +37,7 @@ class LayerConverter(object):
             element = self.create_image(layer)
 
         elif isinstance(layer, ShapeLayer):
-            element = self.create_path(layer)
+            element = self.create_shape_group(layer)
             element = self.add_fill(layer, element)
             element = self.add_stroke_style(layer, element)
 
@@ -62,7 +62,7 @@ class LayerConverter(object):
 
         if layer.has_vector_mask() and layer.kind != 'shape':
             clippath = self._dwg.defs.add(self._dwg.clipPath())
-            clippath.add(self.create_path(layer))
+            clippath.add(self.create_shape_group(layer))
             element['clip-path'] = clippath.get_funciri()
 
         element = self.add_effects(layer, element)
@@ -95,9 +95,9 @@ class LayerConverter(object):
             debug=False)  # To disable attribute validation.
         return element
 
-    def create_path(self, layer):
-        """Create a path element."""
-        path = self._dwg.path(d=self.generate_path(layer.vector_mask))
+    def create_shape_group(self, layer):
+        """Create a group consisting of individual path elements."""
+        path = self.convert_shape(layer.vector_mask)
         if layer.vector_mask.initial_fill_rule:
             element = self._dwg.defs.add(self._dwg.rect(
                 insert=(self._psd.bbox[0], self._psd.bbox[1]),

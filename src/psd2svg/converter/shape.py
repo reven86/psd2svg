@@ -10,37 +10,68 @@ logger = getLogger(__name__)
 
 class ShapeConverter(object):
 
-    def generate_path(self, vector_mask, command='C'):
-        """Sequence generator for SVG path constructor."""
+    def convert_shape(self, vector_mask):
+        """Convert each path in vector_mask as individual path element. Groups the together."""
 
-        # TODO: Implement even-odd rule for multiple paths.
-        # first path --> show, second path --> hide, third path --> show.
-        # should be clipPath.
+        if len(vector_mask.paths) == 1:
+            return self._dwg.path(d=self._generate_path(path))
+
+        container = self._dwg.g()
+        mask = None
         for path in vector_mask.paths:
             if len(path) == 0:
                 continue
+            
+            element = self._dwg.path(d=self._generate_path(path))
+            if path.operation == 1:     # addition
+                container.add(element)
+            elif path.operation == 2:   # subtraction
+                if not mask:
+                    mask = self._dwg.defs.add(self._dwg.mask())
+                    mask.add(self._dwg.rect(
+                        insert=(self._psd.bbox[0], self._psd.bbox[1]),
+                        size=(self._psd.bbox[2] - self._psd.bbox[0],
+                              self._psd.bbox[3] - self._psd.bbox[1]),
+                        fill='white'))
 
-            # Initial point.
-            yield 'M'
-            yield path[0].anchor[1] * self.width
-            yield path[0].anchor[0] * self.height
-            yield command
+                element['fill'] = 'black'
+                mask.add(element)
+            else:
+                logger.warn(f'Unsupported path operation {path.operation}')
 
-            # Closed path or open path
-            points = (zip(path, path[1:] + path[0:1]) if path.is_closed()
-                      else zip(path, path[1:]))
+        if mask:
+            container['mask'] = mask.get_funciri()
 
-            # Rest of the points.
-            for p1, p2 in points:
-                yield p1.leaving[1] * self.width
-                yield p1.leaving[0] * self.height
-                yield p2.preceding[1] * self.width
-                yield p2.preceding[0] * self.height
-                yield p2.anchor[1] * self.width
-                yield p2.anchor[0] * self.height
+        return container
 
-            if path.is_closed():
-                yield 'Z'
+
+    def _generate_path(self, path, command='C'):
+        """Sequence generator for SVG path constructor."""
+
+        if len(path) == 0:
+            return
+
+        # Initial point.
+        yield 'M'
+        yield path[0].anchor[1] * self.width
+        yield path[0].anchor[0] * self.height
+        yield command
+
+        # Closed path or open path
+        points = (zip(path, path[1:] + path[0:1]) if path.is_closed()
+                    else zip(path, path[1:]))
+
+        # Rest of the points.
+        for p1, p2 in points:
+            yield p1.leaving[1] * self.width
+            yield p1.leaving[0] * self.height
+            yield p2.preceding[1] * self.width
+            yield p2.preceding[0] * self.height
+            yield p2.anchor[1] * self.width
+            yield p2.anchor[0] * self.height
+
+        if path.is_closed():
+            yield 'Z'
 
 
     def add_stroke_style(self, layer, element):
@@ -55,8 +86,7 @@ class ShapeConverter(object):
         if stroke.line_alignment == 'inner':
             clippath = self._dwg.defs.add(self._dwg.clipPath())
             clippath['class'] = 'psd-stroke stroke-inner'
-            clippath.add(self._dwg.path(
-                self.generate_path(layer.vector_mask)))
+            clippath.add(self.convert_shape(layer.vector_mask))
             element['stroke-width'] = stroke.line_width.value * 2
             element['clip-path'] = clippath.get_funciri()
         # elif stroke.line_alignment == 'outer':
@@ -66,8 +96,7 @@ class ShapeConverter(object):
         #         insert=(layer.left, layer.top),
         #         size=(layer.width, layer.height),
         #         fill='white'))
-        #     mask.add(self._dwg.path(
-        #         self.generate_path(layer.vector_mask), fill='black'))
+        #     mask.add(self.convert_shape(layer.vector_mask), fill='black'))
         #     element['stroke-width'] = stroke.line_width * 2
         #     element['mask'] = mask.get_funciri()
         else:
