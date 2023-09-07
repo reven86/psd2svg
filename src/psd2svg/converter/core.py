@@ -37,7 +37,10 @@ class LayerConverter(object):
             element = self.create_image(layer)
 
         elif isinstance(layer, ShapeLayer):
-            element = self.create_shape_group(layer)
+            element = self.convert_shape(layer)
+            if not element:
+                return None
+
             element = self.add_fill(layer, element)
             element = self.add_stroke_style(layer, element)
 
@@ -60,11 +63,10 @@ class LayerConverter(object):
             if mask_element:
                 element['mask'] = mask_element.get_funciri()
 
-        if layer.has_vector_mask() and layer.kind != 'shape':
-            clippath = self._dwg.defs.add(self._dwg.clipPath())
-            clippath.add(self.create_shape_group(layer))
-            element['clip-path'] = clippath.get_funciri()
-
+        if layer.has_vector_mask() and not layer.vector_mask.disabled and not isinstance(layer, ShapeLayer):
+            assert layer.is_group(), "Vector mask alone is only supported for group layers"
+            element = self.convert_shape(layer, [element])   # pass group as initial elements
+                        
         element = self.add_effects(layer, element)
 
         # Clipping is in group, because the parent is not accessible...
@@ -94,30 +96,6 @@ class LayerConverter(object):
             size=(layer.width, layer.height),
             debug=False)  # To disable attribute validation.
         return element
-
-    def create_shape_group(self, layer):
-        """Create a group consisting of individual path elements."""
-        path = self.convert_shape(layer.vector_mask)
-        if layer.vector_mask.initial_fill_rule:
-            element = self._dwg.defs.add(self._dwg.rect(
-                insert=(self._psd.bbox[0], self._psd.bbox[1]),
-                size=(self._psd.bbox[2] - self._psd.bbox[0],
-                      self._psd.bbox[3] - self._psd.bbox[1])))
-            mask = self._dwg.defs.add(self._dwg.mask())
-            mask.add(self._dwg.rect(
-                insert=(self._psd.bbox[0], self._psd.bbox[1]),
-                size=(self._psd.bbox[2] - self._psd.bbox[0],
-                      self._psd.bbox[3] - self._psd.bbox[1]),
-                fill='white'))
-            path['fill'] = 'black'
-            path['clip-rule'] = 'evenodd'
-            mask.add(path)
-            element['mask'] = mask.get_funciri()
-            use = self._dwg.use(element.get_iri())
-            return use
-        else:
-            path['fill-rule'] = 'evenodd'
-            return path
 
     def create_rect(self, layer):
         """Create a shape or adjustment element."""

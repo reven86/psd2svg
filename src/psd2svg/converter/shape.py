@@ -10,22 +10,40 @@ logger = getLogger(__name__)
 
 class ShapeConverter(object):
 
-    def convert_shape(self, vector_mask):
+    def _group_elements(self, elements, mask, clip_path):
+        if not elements:
+            assert not mask and not clip_path, "Mask and clip_path specified for no path elements"
+            return None
+
+        if len(elements) == 1:
+            container = elements[0]
+        else:
+            container = self._dwg.g()
+            for el in elements:
+                container.add(el)
+
+        if mask:
+            container['mask'] = mask.get_funciri()
+
+        if clip_path:
+            container['clip-path'] = clip_path.get_funciri()
+
+        return container
+
+    def convert_shape(self, layer, initial_elements=None):
         """Convert each path in vector_mask as individual path element. Groups the together."""
 
-        if len(vector_mask.paths) == 1:
-            return self._dwg.path(d=self._generate_path(vector_mask.paths[0]))
-
-        container = self._dwg.g()
+        elements = []
+        if initial_elements:
+            elements.extend(initial_elements)
         mask = None
-        for path in vector_mask.paths:
+        clip_path = None
+        for path in layer.vector_mask.paths:
             if len(path) == 0:
                 continue
             
             element = self._dwg.path(d=self._generate_path(path))
-            if path.operation == 1:     # addition
-                container.add(element)
-            elif path.operation == 2:   # subtraction
+            if path.operation == 2:   # subtraction, applies only to previous paths
                 if not mask:
                     mask = self._dwg.defs.add(self._dwg.mask())
                     mask.add(self._dwg.rect(
@@ -36,13 +54,24 @@ class ShapeConverter(object):
 
                 element['fill'] = 'black'
                 mask.add(element)
+            elif path.operation == 3:   # intersection
+                if not clip_path:
+                    clip_path = self._dwg.defs.add(self._dwg.clipPath())
+                clip_path.add(element)
             else:
-                logger.warn(f'Unsupported path operation {path.operation}')
+                if layer.vector_mask.initial_fill_rule != 0:
+                    logger.warn(f'initial_fill_rule != 0 not implemented yet, layer {layer}')
+                if path.operation != 1:     # addition
+                    logger.warn(f'Unsupported path operation {path.operation} layer {layer}. Interpreting as addition (1)')
+                if mask or clip_path:
+                    # combine mask with previous elements before drawing new path
+                    elements = [self._group_elements(elements, mask, clip_path)]
+                    mask = None
+                    clip_path = None
+                
+                elements.append(element)
 
-        if mask:
-            container['mask'] = mask.get_funciri()
-
-        return container
+        return self._group_elements(elements, mask, clip_path)
 
 
     def _generate_path(self, path, command='C'):
@@ -86,7 +115,7 @@ class ShapeConverter(object):
         if stroke.line_alignment == 'inner':
             clippath = self._dwg.defs.add(self._dwg.clipPath())
             clippath['class'] = 'psd-stroke stroke-inner'
-            clippath.add(self.convert_shape(layer.vector_mask))
+            clippath.add(self.convert_shape(layer.vector_mask))     # not tested, could be vector_mask is already has subtract path operations
             element['stroke-width'] = stroke.line_width.value * 2
             element['clip-path'] = clippath.get_funciri()
         # elif stroke.line_alignment == 'outer':

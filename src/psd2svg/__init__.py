@@ -20,6 +20,11 @@ def psd2svg(input, output=None, **kwargs):
     converter = PSD2SVG(**kwargs)
 
     if os.path.isdir(input):
+        try:
+            if output:            
+                os.makedirs(output)            
+        except:
+            pass                    
         for filename in os.listdir(input):
             if filename[-4:] == '.psd':
                 converter.convert(os.path.join(input, filename), os.path.join(output or '', filename[:-4] + '.svg'))
