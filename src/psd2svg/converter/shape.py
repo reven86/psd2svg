@@ -26,8 +26,12 @@ class ShapeConverter(object):
             container['mask'] = mask.get_funciri()
 
         if clip_path:
-            container['clip-path'] = clip_path.get_funciri()
+            clip_path_element = self._dwg.defs.add(self._dwg.clipPath())
+            clip_path_element.add(clip_path)
+            clip_path_element['clip-rule'] = 'evenodd'
+            container['clip-path'] = clip_path_element.get_funciri()
 
+        container['fill-rule'] = 'evenodd'
         return container
 
     def convert_shape(self, layer, initial_elements=None):
@@ -36,14 +40,36 @@ class ShapeConverter(object):
         elements = []
         if initial_elements:
             elements.extend(initial_elements)
-        mask = None
-        clip_path = None
+
+        # preprocess paths, link path with operation == -1 to the previous one
+        path_set = []
         for path in layer.vector_mask.paths:
             if len(path) == 0:
                 continue
             
-            element = self._dwg.path(d=self._generate_path(path))
-            if path.operation == 2:   # subtraction, applies only to previous paths
+            if path.operation == -1:
+                assert path_set
+                path_set[-1].append(path)
+            else:
+                path_set.append([path])
+            
+        mask = None
+        clip_path = None
+        for path_list in path_set:            
+            operation = path_list[0].operation
+            element = self._dwg.path(d=self._generate_path(path_list))
+            
+            if operation == 1:   # standard "or" operation
+                if layer.vector_mask.initial_fill_rule != 0:
+                    logger.warn(f'initial_fill_rule != 0 not implemented yet, layer {layer}')
+                if mask or clip_path:
+                    # combine mask with previous elements before drawing new path
+                    elements = [self._group_elements(elements, mask, clip_path)]
+                    mask = None
+                    clip_path = None
+                
+                elements.append(element)
+            elif operation == 2:   # subtraction, applies only to previous paths
                 if not mask:
                     mask = self._dwg.defs.add(self._dwg.mask())
                     mask.add(self._dwg.rect(
@@ -54,53 +80,52 @@ class ShapeConverter(object):
 
                 element['fill'] = 'black'
                 mask.add(element)
-            elif path.operation == 3:   # intersection
-                if not clip_path:
-                    clip_path = self._dwg.defs.add(self._dwg.clipPath())
-                clip_path.add(element)
+            elif operation == 3:   # intersection
+                if clip_path:
+                    # 'and' operations should apply one after other, can't combine several paths into clip_path attribute
+                    # because it will apply intersection in a wrong way
+                    if not elements:
+                        # this means there is only one preceding element with "and" operation, combine then two
+                        assert not mask
+                        elements = [clip_path]
+                    else:
+                        # apply intersection for preceding "and" path
+                        elements = [self._group_elements(elements, mask, clip_path)]
+                        mask = None
+                clip_path = element
             else:
-                if layer.vector_mask.initial_fill_rule != 0:
-                    logger.warn(f'initial_fill_rule != 0 not implemented yet, layer {layer}')
-                if path.operation != 1:     # addition
-                    logger.warn(f'Unsupported path operation {path.operation} layer {layer}. Interpreting as addition (1)')
-                if mask or clip_path:
-                    # combine mask with previous elements before drawing new path
-                    elements = [self._group_elements(elements, mask, clip_path)]
-                    mask = None
-                    clip_path = None
-                
-                elements.append(element)
+                logger.error(f'Unsupported path operation {operation} layer {layer}')
 
         return self._group_elements(elements, mask, clip_path)
 
 
-    def _generate_path(self, path, command='C'):
+    def _generate_path(self, path_list, command='C'):
         """Sequence generator for SVG path constructor."""
 
-        if len(path) == 0:
-            return
+        for path in path_list:
+            assert len(path)
 
-        # Initial point.
-        yield 'M'
-        yield path[0].anchor[1] * self.width
-        yield path[0].anchor[0] * self.height
-        yield command
+            # Initial point.
+            yield 'M'
+            yield path[0].anchor[1] * self.width
+            yield path[0].anchor[0] * self.height
+            yield command
 
-        # Closed path or open path
-        points = (zip(path, path[1:] + path[0:1]) if path.is_closed()
-                    else zip(path, path[1:]))
+            # Closed path or open path
+            points = (zip(path, path[1:] + path[0:1]) if path.is_closed()
+                        else zip(path, path[1:]))
 
-        # Rest of the points.
-        for p1, p2 in points:
-            yield p1.leaving[1] * self.width
-            yield p1.leaving[0] * self.height
-            yield p2.preceding[1] * self.width
-            yield p2.preceding[0] * self.height
-            yield p2.anchor[1] * self.width
-            yield p2.anchor[0] * self.height
+            # Rest of the points.
+            for p1, p2 in points:
+                yield p1.leaving[1] * self.width
+                yield p1.leaving[0] * self.height
+                yield p2.preceding[1] * self.width
+                yield p2.preceding[0] * self.height
+                yield p2.anchor[1] * self.width
+                yield p2.anchor[0] * self.height
 
-        if path.is_closed():
-            yield 'Z'
+            if path.is_closed():
+                yield 'Z'
 
 
     def add_stroke_style(self, layer, element):
