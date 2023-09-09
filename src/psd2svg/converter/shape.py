@@ -81,18 +81,18 @@ class ShapeConverter(object):
                 element['fill'] = 'black'
                 mask.add(element)
             elif operation == 3:   # intersection
-                if clip_path:
+                if not elements:
+                    # this means there is only one preceding element with "and" operation, combine then two
+                    elements.append(element)
+                else:
                     # 'and' operations should apply one after other, can't combine several paths into clip_path attribute
                     # because it will apply intersection in a wrong way
-                    if not elements:
-                        # this means there is only one preceding element with "and" operation, combine then two
-                        assert not mask
-                        elements = [clip_path]
-                    else:
+
+                    if clip_path:
                         # apply intersection for preceding "and" path
                         elements = [self._group_elements(elements, mask, clip_path)]
                         mask = None
-                clip_path = element
+                    clip_path = element
             else:
                 logger.error(f'Unsupported path operation {operation} layer {layer}')
 
