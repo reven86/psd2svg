@@ -4,7 +4,7 @@ from logging import getLogger
 import svgwrite
 from psd_tools.api.layers import AdjustmentLayer, FillLayer, ShapeLayer
 from psd_tools.api.pil_io import convert_pattern_to_pil
-from psd_tools.constants import TaggedBlockID
+from psd_tools.constants import Tag
 from psd2svg.converter.constants import BLEND_MODE
 from psd2svg.utils.xml import safe_utf8
 from psd2svg.utils.color import cmyk2rgb
@@ -167,17 +167,17 @@ class LayerConverter(object):
 
     def add_fill(self, layer, element):
         """Add fill attribute to the given element."""
-        if 'SOLID_COLOR_SHEET_SETTING' in layer.tagged_blocks:
+        if Tag.SOLID_COLOR_SHEET_SETTING in layer.tagged_blocks:
             setting = layer.tagged_blocks.get_data(
-                'SOLID_COLOR_SHEET_SETTING'
+                Tag.SOLID_COLOR_SHEET_SETTING
             )
             element['fill'] = self.create_solid_color(setting['Clr '])
-        elif 'PATTERN_FILL_SETTING' in layer.tagged_blocks:
-            setting = layer.tagged_blocks.get_data('PATTERN_FILL_SETTING')
+        elif Tag.PATTERN_FILL_SETTING in layer.tagged_blocks:
+            setting = layer.tagged_blocks.get_data(Tag.PATTERN_FILL_SETTING)
             pattern_element = self.create_pattern(setting)
             element['fill'] = pattern_element.get_funciri()
-        elif 'GRADIENT_FILL_SETTING' in layer.tagged_blocks:
-            setting = layer.tagged_blocks.get_data('GRADIENT_FILL_SETTING')
+        elif Tag.GRADIENT_FILL_SETTING in layer.tagged_blocks:
+            setting = layer.tagged_blocks.get_data(Tag.GRADIENT_FILL_SETTING)
             gradient = self.create_gradient(setting, layer.size)
             element['fill'] = gradient.get_funciri()
         return element
