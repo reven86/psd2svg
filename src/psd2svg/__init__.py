@@ -41,10 +41,11 @@ class PSD2SVG(AdjustmentsConverter, EffectsConverter, LayerConverter,
     output_url - url or file-like object to export svg. if None, return data.
     export_resource - use dataURI to embed bitmap (default True)
     """
-    def __init__(self, resource_path=None, shapes_only=False, compact=False):
+    def __init__(self, resource_path=None, shapes_only=False, compact=False, padding=None):
         self.resource_path = resource_path
         self.shapes_only = shapes_only
-        self.compact = compact        
+        self.compact = compact
+        self.padding = padding
 
     def reset(self):
         """Reset the converter."""
@@ -64,17 +65,37 @@ class PSD2SVG(AdjustmentsConverter, EffectsConverter, LayerConverter,
         if bbox == (0, 0, 0, 0):
             bbox = self._psd.viewbox
 
+        if self.padding:
+            viewbox = bbox
+            bbox = (bbox[0] - self.padding[0], bbox[1] - self.padding[1], bbox[2] + self.padding[2], bbox[3] + self.padding[3])
+
         self._dwg = svgwrite.Drawing(
             size=(bbox[2] - bbox[0], bbox[3] - bbox[1]),
             viewBox='%d %d %d %d' % (
                 bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]
             ),
         )
-        if layer.is_group():
-            self.create_group(layer, self._dwg)
-        else:
-            self._dwg.add(self.convert_layer(layer))
 
+        container = self._dwg.g() if self.padding else self._dwg
+
+        if layer.is_group():
+            self.create_group(layer, container)
+        else:
+            container.add(self.convert_layer(layer))
+            
+        if self.padding:
+            self._dwg.add(container)
+            
+            # clip element using original viewbox
+            clip_path = self._dwg.defs.add(self._dwg.clipPath())
+            clip_path.add(self._dwg.rect(
+                insert=(viewbox[0], viewbox[1]),
+                size=(viewbox[2] - viewbox[0],
+                        viewbox[3] - viewbox[1]),
+                ))
+
+            container['clip-path'] = clip_path.get_funciri()
+                    
         # Layerless PSDImage.
         if (
             isinstance(layer, PSDImage) and len(layer) == 0 and
