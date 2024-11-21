@@ -2,6 +2,7 @@
 from __future__ import absolute_import, unicode_literals
 from logging import getLogger
 import os
+from tkinter import SE
 import svgwrite
 from psd_tools import PSDImage
 from psd2svg.converter.adjustments import AdjustmentsConverter
@@ -41,11 +42,12 @@ class PSD2SVG(AdjustmentsConverter, EffectsConverter, LayerConverter,
     output_url - url or file-like object to export svg. if None, return data.
     export_resource - use dataURI to embed bitmap (default True)
     """
-    def __init__(self, resource_path=None, shapes_only=False, compact=False, padding=None):
+    def __init__(self, resource_path=None, shapes_only=False, compact=False, padding=None, remove_color=False):
         self.resource_path = resource_path
         self.shapes_only = shapes_only
         self.compact = compact
         self.padding = padding
+        self.remove_color = remove_color
 
     def reset(self):
         """Reset the converter."""

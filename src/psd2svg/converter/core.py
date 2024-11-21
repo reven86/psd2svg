@@ -167,6 +167,9 @@ class LayerConverter(object):
 
     def add_fill(self, layer, element):
         """Add fill attribute to the given element."""
+        if self.remove_color:
+            return element
+
         if Tag.SOLID_COLOR_SHEET_SETTING in layer.tagged_blocks:
             setting = layer.tagged_blocks.get_data(
                 Tag.SOLID_COLOR_SHEET_SETTING
