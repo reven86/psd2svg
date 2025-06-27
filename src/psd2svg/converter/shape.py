@@ -59,7 +59,7 @@ class ShapeConverter(object):
             operation = path_list[0].operation
             element = self._dwg.path(d=self._generate_path(path_list))
             
-            if operation == 1:   # standard "or" operation
+            if operation == 1 or operation == 0:   # standard "or" operation
                 if layer.vector_mask.initial_fill_rule != 0:
                     logger.warn(f'initial_fill_rule != 0 not implemented yet, layer {layer}')
                 if mask or clip_path:
